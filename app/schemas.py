@@ -1,9 +1,4 @@
-"""Esquema del pedido.
-
-Este archivo es el contrato entre el modelo y el resto del sistema. Si un campo
-no esta aqui, no existe. Definirlo antes de escribir los agentes es a proposito:
-sin contrato, cada agente inventa su propia forma de los datos.
-"""
+"""Esquema del pedido: contrato entre el modelo y el resto del sistema."""
 
 from datetime import date, time
 from typing import Literal
@@ -14,23 +9,14 @@ Classification = Literal["ORDER", "QUESTION", "OTHER"]
 
 
 class OrderItem(BaseModel):
-    """Un producto dentro del pedido."""
-
-    description: str = Field(
-        description="Las palabras del cliente tal como las escribio, sin normalizar"
-    )
+    description: str = Field(description="Las palabras del cliente, sin normalizar")
     quantity: int = 1
     flavor: str | None = None
     size: str | None = None
-    product_id: str | None = Field(
-        default=None,
-        description="Lo llena el resolver contra el catalogo, nunca el extractor",
-    )
+    product_id: str | None = Field(default=None, description="Lo llena el resolver")
 
 
 class Order(BaseModel):
-    """El pedido estructurado."""
-
     items: list[OrderItem] = []
     delivery_date: date | None = None
     delivery_time: time | None = None
@@ -42,8 +28,6 @@ class Order(BaseModel):
 
 
 class ExtractionResult(BaseModel):
-    """Lo que devuelve la API."""
-
     classification: Classification
     order: Order | None = None
     missing_fields: list[str] = []

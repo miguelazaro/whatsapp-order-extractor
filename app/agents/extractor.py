@@ -1,4 +1,4 @@
-"""Agente 2: convierte un mensaje en un pedido estructurado."""
+"""Convierte un mensaje de WhatsApp en un pedido estructurado."""
 
 import json
 from datetime import date
@@ -19,12 +19,7 @@ class ExtractionError(RuntimeError):
 
 
 def _solo_json(texto: str) -> str:
-    """Saca el objeto JSON de una respuesta que puede traer adornos.
-
-    El modelo suele envolver el JSON en un bloque de codigo o ponerle una
-    frase antes. Buscar el primer { y el ultimo } aguanta cualquiera de
-    esas formas, a diferencia de quitar las comillas invertidas a mano.
-    """
+    """Extrae el objeto JSON de una respuesta que puede traer adornos."""
     inicio = texto.find("{")
     fin = texto.rfind("}")
     if inicio == -1 or fin == -1 or fin < inicio:
@@ -33,17 +28,12 @@ def _solo_json(texto: str) -> str:
 
 
 def extract(message: str, today: date) -> Order:
-    """Convierte un mensaje de WhatsApp en un pedido estructurado.
-
-    El mensaje del cliente se sustituye AL FINAL, despues de today y
-    weekday. Si se hiciera primero, un mensaje que contenga el texto
-    {{today}} haria que el siguiente reemplazo entre a modificar el
-    contenido del cliente. Lo no confiable va siempre al ultimo.
-    """
     prompt = (
         PROMPT_PATH.read_text(encoding="utf-8")
         .replace("{{today}}", today.isoformat())
         .replace("{{weekday}}", DIAS[today.weekday()])
+        # El contenido del cliente va al final para que no altere los
+        # marcadores que se sustituyen despues.
         .replace("{{message}}", message)
     )
 

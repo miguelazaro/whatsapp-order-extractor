@@ -1,9 +1,5 @@
 """Prueba de humo del clasificador, con tiempos.
 
-Separa lo que tarda arrancar Python e importar el SDK de lo que tarda de
-verdad la llamada al modelo. Correr esto una vez es mucho mas rapido que
-tres `python -c` seguidos, porque el arranque se paga una sola vez.
-
     python scripts/smoke_classifier.py
 """
 
