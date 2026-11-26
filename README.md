@@ -88,6 +88,11 @@ LLM_MODEL=
 
 In development.
 
-Working: classifier, extractor, schema validation, evaluation suite.
-Pending: `POST /extract`, an LLM judge for the free-text fields, catalog resolution,
-unit tests and a Dockerfile.
+Working: `POST /extract`, classifier, extractor, schema validation, completeness
+check, and the evaluation suite. 19 unit tests, none of which call the model:
+
+```
+python -m pytest -q
+```
+
+Pending: an LLM judge for the free-text fields, catalog resolution and a Dockerfile.
