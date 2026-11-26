@@ -1,10 +1,16 @@
 """Suite de evaluacion: acierto por campo sobre evals/cases.jsonl.
 
     python evals/run.py
+    python evals/run.py --runs 3
+
+Con --runs mayor a 1 cada caso se corre varias veces. Un caso que acierta en
+unas corridas y falla en otras es inestable, no un defecto: el modelo no es
+determinista ni con temperature=0.
 
 Los campos de texto libre quedan sin evaluar hasta que exista evals/judge.py.
 """
 
+import argparse
 import json
 import statistics
 import sys
@@ -26,8 +32,10 @@ CAMPOS_PENDIENTES = ["dedication", "notes", "description", "address"]
 
 UMBRAL_REINTENTO_S = 5.0
 
-# La capa gratuita limita peticiones por minuto; sin pausa aparecen 429.
-PAUSA_ENTRE_CASOS_S = 2.0
+# La capa gratuita limita peticiones por minuto. Cada caso hace hasta dos
+# llamadas, asi que la pausa mantiene el ritmo por debajo del limite.
+PAUSA_ENTRE_LLAMADAS_S = 5.0
+ESPERA_429_S = 30.0
 
 
 def _as_str(valor):
@@ -98,48 +106,79 @@ def evaluar_caso(caso):
     return comparaciones, None, time.perf_counter() - inicio
 
 
+def evaluar_con_backoff(caso):
+    comparaciones, falla, segundos = evaluar_caso(caso)
+    if falla and "RateLimitError" in falla:
+        time.sleep(ESPERA_429_S)
+        comparaciones, falla, segundos = evaluar_caso(caso)
+        return comparaciones, falla, segundos, True
+    return comparaciones, falla, segundos, False
+
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--runs", type=int, default=1, help="corridas por caso")
+    args = parser.parse_args()
+    corridas = max(1, args.runs)
+
     casos = cargar_casos()
-    print(f"Corriendo {len(casos)} casos de {CASOS_PATH.name}\n")
+    print(f"Corriendo {len(casos)} casos x {corridas} de {CASOS_PATH.name}\n")
 
     por_campo = {}
-    perfectos = 0
+    por_caso = {}
     fallas_sistema = []
+    esperas_429 = 0
     latencias = []
     lentas = 0
-    detalle = []
+    primera = True
 
-    for indice, caso in enumerate(casos):
-        if indice:
-            time.sleep(PAUSA_ENTRE_CASOS_S)
-        comparaciones, falla, segundos = evaluar_caso(caso)
-        latencias.append(segundos)
-        if segundos > UMBRAL_REINTENTO_S:
-            lentas += 1
+    for caso in casos:
+        aciertos_caso = 0
+        errores_vistos = []
+        fallas_caso = []
 
-        if falla:
-            fallas_sistema.append((caso["id"], falla))
-            print(f"  {caso['id']} [{caso.get('tag','')}]  FALLA DE SISTEMA: {falla}")
-            continue
+        for _ in range(corridas):
+            if not primera:
+                time.sleep(PAUSA_ENTRE_LLAMADAS_S)
+            primera = False
 
-        errores = []
-        for campo, esp, obt, acerto in comparaciones:
-            registro = por_campo.setdefault(campo, {"ok": 0, "total": 0})
-            registro["total"] += 1
-            registro["ok"] += acerto
-            if not acerto:
-                errores.append(f"{campo}: esperado {esp!r}, obtenido {obt!r}")
+            comparaciones, falla, segundos, espero = evaluar_con_backoff(caso)
+            esperas_429 += espero
+            latencias.append(segundos)
+            if segundos > UMBRAL_REINTENTO_S:
+                lentas += 1
 
-        if errores:
-            print(f"  {caso['id']} [{caso.get('tag','')}]  {segundos:5.1f}s")
-            for e in errores:
-                print(f"       {e}")
-            detalle.append({"id": caso["id"], "errores": errores})
-        else:
-            perfectos += 1
-            print(f"  {caso['id']} [{caso.get('tag','')}]  {segundos:5.1f}s  OK")
+            if falla:
+                fallas_sistema.append((caso["id"], falla))
+                fallas_caso.append(falla)
+                continue
 
-    evaluados = len(casos) - len(fallas_sistema)
+            errores = []
+            for campo, esp, obt, acerto in comparaciones:
+                registro = por_campo.setdefault(campo, {"ok": 0, "total": 0})
+                registro["total"] += 1
+                registro["ok"] += acerto
+                if not acerto:
+                    texto = f"{campo}: esperado {esp!r}, obtenido {obt!r}"
+                    if texto not in errores_vistos:
+                        errores_vistos.append(texto)
+                    errores.append(texto)
+
+            if not errores:
+                aciertos_caso += 1
+
+        por_caso[caso["id"]] = aciertos_caso
+        marca = f"{aciertos_caso}/{corridas}"
+        estado = "OK" if aciertos_caso == corridas else ""
+        print(f"  {caso['id']:5} [{caso.get('tag',''):16}] {marca:>5}  {estado}")
+        for texto in errores_vistos:
+            print(f"         {texto}")
+        for falla in set(fallas_caso):
+            print(f"         FALLA DE SISTEMA: {falla}")
+
+    estables_ok = [i for i, a in por_caso.items() if a == corridas]
+    estables_falla = [i for i, a in por_caso.items() if a == 0]
+    inestables = [i for i, a in por_caso.items() if 0 < a < corridas]
 
     print("\n" + "=" * 56)
     print("ACIERTO POR CAMPO")
@@ -147,25 +186,23 @@ def main():
     for campo, r in por_campo.items():
         pct = 100 * r["ok"] / r["total"] if r["total"] else 0
         print(f"  {campo:16} {pct:5.1f}%   ({r['ok']}/{r['total']})")
-
     for campo in CAMPOS_PENDIENTES:
         print(f"  {campo:16}   sin evaluar (necesita juez)")
 
     print("\n" + "=" * 56)
-    pct_perfectos = 100 * perfectos / evaluados if evaluados else 0
-    print(f"  Casos perfectos      {pct_perfectos:5.1f}%   ({perfectos}/{evaluados})")
-    print(f"  Fallas de sistema    {len(fallas_sistema)} de {len(casos)}")
+    pct = 100 * len(estables_ok) / len(casos) if casos else 0
+    print(f"  Casos perfectos siempre  {pct:5.1f}%   ({len(estables_ok)}/{len(casos)})")
+    if corridas > 1:
+        print(f"  Fallan siempre           {len(estables_falla)}  {sorted(estables_falla)}")
+        print(f"  Inestables               {len(inestables)}  {sorted(inestables)}")
+    print(f"  Fallas de sistema        {len(fallas_sistema)}")
+    print(f"  Esperas por 429          {esperas_429}")
     if latencias:
         ordenadas = sorted(latencias)
         p95 = ordenadas[int(len(ordenadas) * 0.95) - 1] if len(ordenadas) > 1 else ordenadas[0]
-        print(f"  Latencia mediana     {statistics.median(latencias):5.2f}s")
-        print(f"  Latencia p95         {p95:5.2f}s")
-        print(f"  Llamadas > {UMBRAL_REINTENTO_S:.0f}s        {lentas}  (probables reintentos)")
-
-    if fallas_sistema:
-        print("\n  Fallas de sistema:")
-        for id_caso, motivo in fallas_sistema:
-            print(f"    {id_caso}: {motivo}")
+        print(f"  Latencia mediana         {statistics.median(latencias):5.2f}s")
+        print(f"  Latencia p95             {p95:5.2f}s")
+        print(f"  Llamadas > {UMBRAL_REINTENTO_S:.0f}s            {lentas}")
 
     RESULTADOS_DIR.mkdir(exist_ok=True)
     salida = RESULTADOS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}.json"
@@ -174,12 +211,15 @@ def main():
             {
                 "fecha": datetime.now().isoformat(timespec="seconds"),
                 "casos": len(casos),
+                "corridas": corridas,
                 "por_campo": por_campo,
-                "perfectos": perfectos,
-                "evaluados": evaluados,
+                "por_caso": por_caso,
+                "estables_ok": sorted(estables_ok),
+                "estables_falla": sorted(estables_falla),
+                "inestables": sorted(inestables),
                 "fallas_sistema": fallas_sistema,
+                "esperas_429": esperas_429,
                 "latencia_mediana": statistics.median(latencias) if latencias else None,
-                "detalle": detalle,
             },
             indent=2,
             ensure_ascii=False,
