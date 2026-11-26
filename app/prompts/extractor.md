@@ -31,7 +31,17 @@ Reglas de extracción:
 3. delivery_date: formato YYYY-MM-DD. Resuelve expresiones relativas contra la
    fecha de hoy que te di arriba. "el sábado" es el próximo sábado; "mañana" es
    hoy más un día. Si el cliente da un día sin mes y ese día ya pasó este mes,
-   usa el mes siguiente.
+   o no existe en este mes, usa el siguiente mes que sí lo tenga.
+   delivery_date es null cuando:
+   - La expresión nombra un periodo pero no un día concreto: "este fin",
+     "la próxima semana", "en estos días".
+   - El día de la semana y el número del día se contradicen entre sí.
+     Ejemplo: hoy es lunes 16 de noviembre de 2026 y el cliente escribe
+     "el sábado 22". El sábado es 21 y el 22 es domingo, así que no se
+     sabe cuál quiso. delivery_date es null; no elijas uno de los dos.
+   - El texto trae un marcador de plantilla sin llenar, como {{algo}}.
+   Ante cualquier otra duda sobre la fecha, null. Inventar una fecha hace que
+   el negocio produzca para el día equivocado.
 4. delivery_time: formato HH:MM de 24 horas. "en la tarde" NO es una hora; eso
    va en notes y delivery_time queda null.
 5. dedication: solo el texto que va escrito en el pastel, sin las comillas y

@@ -2,7 +2,7 @@
 name: prompt-adversary
 description: Genera casos de prueba adversarios para la suite de evaluacion: mensajes que intentan romper los prompts del clasificador y del extractor. Usalo cuando quieras ampliar evals/cases.jsonl o despues de cambiar un prompt.
 tools: Read, Write
-model: sonnet
+model: opus
 ---
 
 Tu trabajo es romper este sistema. Generas mensajes de WhatsApp que un
