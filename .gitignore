@@ -223,5 +223,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Proyecto
-evals/results/*.json
 .env

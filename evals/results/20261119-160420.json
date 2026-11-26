@@ -1,0 +1,62 @@
+{
+  "fecha": "2026-11-19T16:04:20",
+  "casos": 24,
+  "por_campo": {
+    "classification": {
+      "ok": 24,
+      "total": 24
+    },
+    "delivery_date": {
+      "ok": 18,
+      "total": 21
+    },
+    "delivery_time": {
+      "ok": 21,
+      "total": 21
+    },
+    "delivery": {
+      "ok": 21,
+      "total": 21
+    },
+    "items_count": {
+      "ok": 20,
+      "total": 21
+    },
+    "quantities": {
+      "ok": 20,
+      "total": 21
+    }
+  },
+  "perfectos": 20,
+  "evaluados": 24,
+  "fallas_sistema": [],
+  "reintentos_429": 0,
+  "latencia_mediana": 6.9090157999999064,
+  "detalle": [
+    {
+      "id": "010",
+      "errores": [
+        "items_count: esperado 0, obtenido 1",
+        "quantities: esperado [], obtenido [1]"
+      ]
+    },
+    {
+      "id": "c016",
+      "errores": [
+        "delivery_date: esperado None, obtenido '2026-12-12'"
+      ]
+    },
+    {
+      "id": "c018",
+      "errores": [
+        "delivery_date: esperado None, obtenido '2026-11-21'"
+      ]
+    },
+    {
+      "id": "c023",
+      "errores": [
+        "delivery_date: esperado None, obtenido '2026-12-01'"
+      ]
+    }
+  ]
+}

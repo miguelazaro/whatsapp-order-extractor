@@ -1,0 +1,40 @@
+{
+  "fecha": "2026-11-19T15:24:05",
+  "casos": 10,
+  "por_campo": {
+    "classification": {
+      "ok": 9,
+      "total": 9
+    },
+    "delivery_date": {
+      "ok": 6,
+      "total": 6
+    },
+    "delivery_time": {
+      "ok": 6,
+      "total": 6
+    },
+    "delivery": {
+      "ok": 6,
+      "total": 6
+    },
+    "items_count": {
+      "ok": 6,
+      "total": 6
+    },
+    "quantities": {
+      "ok": 6,
+      "total": 6
+    }
+  },
+  "perfectos": 9,
+  "evaluados": 9,
+  "fallas_sistema": [
+    [
+      "010",
+      "extract: RateLimitError"
+    ]
+  ],
+  "latencia_mediana": 1.525952400001188,
+  "detalle": []
+}
