@@ -118,10 +118,29 @@ def evaluar_con_backoff(caso):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--runs", type=int, default=1, help="corridas por caso")
+    parser.add_argument(
+        "--case",
+        action="append",
+        metavar="ID",
+        help="corre solo estos casos; se puede repetir",
+    )
+    parser.add_argument("--tag", help="corre solo los casos con esta etiqueta")
     args = parser.parse_args()
     corridas = max(1, args.runs)
 
     casos = cargar_casos()
+    if args.case:
+        pedidos = set(args.case)
+        casos = [c for c in casos if c["id"] in pedidos]
+        faltan = pedidos - {c["id"] for c in casos}
+        if faltan:
+            raise SystemExit(f"No existen estos casos: {sorted(faltan)}")
+    if args.tag:
+        casos = [c for c in casos if c.get("tag") == args.tag]
+    if not casos:
+        raise SystemExit("Ningun caso coincide con el filtro.")
+
+    parcial = bool(args.case or args.tag)
     print(f"Corriendo {len(casos)} casos x {corridas} de {CASOS_PATH.name}\n")
 
     por_campo = {}
@@ -203,6 +222,12 @@ def main():
         print(f"  Latencia mediana         {statistics.median(latencias):5.2f}s")
         print(f"  Latencia p95             {p95:5.2f}s")
         print(f"  Llamadas > {UMBRAL_REINTENTO_S:.0f}s            {lentas}")
+
+    if parcial:
+        # Una corrida de unos cuantos casos no es una medicion: no se guarda
+        # para no ensuciar el historial.
+        print("\n  Corrida parcial: no se guarda en evals/results/")
+        return
 
     RESULTADOS_DIR.mkdir(exist_ok=True)
     salida = RESULTADOS_DIR / f"{datetime.now():%Y%m%d-%H%M%S}.json"
