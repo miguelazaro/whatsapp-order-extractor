@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import cast
 
 from app.llm import complete
+from app.prompting import render
 from app.schemas import Classification
 
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "classifier.md"
@@ -17,8 +18,7 @@ class ClassificationError(RuntimeError):
 
 def classify(message: str) -> Classification:
     """Clasifica un mensaje de WhatsApp en ORDER, QUESTION u OTHER."""
-    prompt = PROMPT_PATH.read_text(encoding="utf-8")
-    raw = complete(prompt.replace("{{message}}", message), max_tokens=10)
+    raw = complete(render(PROMPT_PATH, message), max_tokens=10)
 
     label = raw.strip().upper().strip(".\"' ")
     if label not in VALID_LABELS:

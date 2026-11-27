@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from app.llm import complete
+from app.prompting import render
 from app.schemas import Order
 
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "extractor.md"
@@ -28,13 +29,11 @@ def _solo_json(texto: str) -> str:
 
 
 def extract(message: str, today: date) -> Order:
-    prompt = (
-        PROMPT_PATH.read_text(encoding="utf-8")
-        .replace("{{today}}", today.isoformat())
-        .replace("{{weekday}}", DIAS[today.weekday()])
-        # El contenido del cliente va al final para que no altere los
-        # marcadores que se sustituyen despues.
-        .replace("{{message}}", message)
+    prompt = render(
+        PROMPT_PATH,
+        message,
+        today=today.isoformat(),
+        weekday=DIAS[today.weekday()],
     )
 
     raw = complete(prompt, max_tokens=800)
